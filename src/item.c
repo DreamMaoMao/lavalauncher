@@ -25,6 +25,7 @@
 #include<stdbool.h>
 #include<unistd.h>
 #include<string.h>
+#include <wordexp.h>
 #include<errno.h>
 #include<sys/wait.h>
 #include<linux/input-event-codes.h>
@@ -161,12 +162,21 @@ static void destroy_all_item_commands (struct Lava_item *item)
  *  Button configuration  *
  *                        *
  **************************/
-static bool button_set_image_path (struct Lava_item *button, const char *path)
-{
-	DESTROY(button->img, image_t_destroy);
-	if ( NULL == (button->img = image_t_create_from_file(path)) )
-		return false;
-	return true;
+static bool button_set_image_path(struct Lava_item *button, const char *path) {
+    wordexp_t exp;
+    if (wordexp(path, &exp, 0) != 0) {  // 解析失败（如路径无效）
+        return false;
+    }
+
+    DESTROY(button->img, image_t_destroy);
+    bool success = false;
+    if (exp.we_wordc > 0) {  // 至少解析出一个路径
+        button->img = image_t_create_from_file(exp.we_wordv[0]);
+        success = (button->img != NULL);
+    }
+
+    wordfree(&exp);  // 释放解析结果
+    return success;
 }
 
 static bool parse_bind_token_buffer (char *buffer, int *index,enum Interaction_type *type,
